@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alter Log</title>
+    <style>
+        /* 全体設定 */
+        body {
+            background-color: #0d0d0d;
+            font-family: 'Courier New', Courier, monospace;
+            color: #00ffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* コンテナ */
+        .log-container, .story-container, .history-area, .name-modal {
+            width: 80%;
+            max-width: 600px;
+            padding: 40px;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 20px #00ffff, 0 0 10px #00ffff inset;
+            background-color: rgba(13, 13, 13, 0.8);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        /* 画面切り替えのためのスタイル */
+        .hidden {
+            display: none !important;
+        }
+
+        /* タイトル */
+        h1, h2 {
+            text-align: center;
+            font-size: 2.5em;
+            text-shadow: 0 0 5px #00ffff;
+            margin-bottom: 20px;
+        }
+        
+        /* 日記入力欄 */
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            font-size: 1em;
+            resize: none;
+            outline: none;
+        }
+
+        /* ボタン */
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #00ffff;
+            color: #0d0d0d;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            box-shadow: 0 0 15px #00ffff, 0 0 10px #00ffff inset;
+            background-color: #00cccc;
+        }
+        /* ボタン無効時のスタイル */
+        button:disabled {
+            background-color: rgba(0, 255, 255, 0.3);
+            cursor: not-allowed;
+            color: #555;
+            box-shadow: none;
+        }
+        
+        /* リセットボタンのスタイル */
+        #resetDataButton {
+            background-color: #ff0000;
+            color: #fff;
+            box-shadow: 0 0 10px #ff0000, 0 0 5px #ff0000 inset;
+        }
+        #resetDataButton:hover {
+            box-shadow: 0 0 15px #ff0000, 0 0 10px #ff0000 inset;
+            background-color: #cc0000;
+        }
+
+        /* デジタルノイズ */
+        .noise-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3'/%3E%3C/filter%3E%3Crect width='256' height='256' fill='transparent' filter='url(%23n)'/%3E%3C/svg%3E"),
+                url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAAAeQhvEAAAAAXNSR0IArs4c6QAAADFJREFUGFdj/P//PwMgYFjBwMDwD6gKkP//Pxj+8P///w/D///P////D7gDAArbDQvBwAAAAABJRU5ErkJggg==");
+            background-size: 100px 100px, 2px 2px;
+            opacity: 0.15;
+            z-index: 1;
+            pointer-events: none;
+            animation:
+                glitchX 0.7s infinite alternate,
+                glitchY 0.9s infinite alternate;
+        }
+        @keyframes glitchX {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(3px); }
+        }
+        @keyframes glitchY {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-2px); }
+        }
+        
+        /* 強いノイズ */
+        .story-container .noise-effect {
+            opacity: 0.3;
+            animation: 
+                glitchX 0.5s infinite alternate,
+                glitchY 0.6s infinite alternate,
+                static 1s steps(10) infinite;
+        }
+        @keyframes static {
+            0% { background-position: 0 0; }
+            100% { background-position: 100% 100%; }
+        }
+
+        /* ステータスメッセージのスタイル */
+        #statusMessage {
+            text-align: center;
+            margin-top: 20px;
+            height: 1.2em;
+            font-size: 1.2em;
+            text-shadow: 0 0 5px #ff00ff;
+        }
+
+        /* 名前入力ポップアップのスタイル */
+        .name-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            flex-direction: column;
+            text-align: center;
+        }
+        .name-modal h2 {
+            font-size: 2em;
+            text-shadow: 0 0 5px #ff00ff;
+        }
+        .name-modal p {
+            font-size: 1.2em;
+            margin-top: 20px;
+        }
+        .name-modal input {
+            background-color: #0d0d0d;
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            font-size: 1.5em;
+            padding: 10px;
+            margin: 10px 0;
+            outline: none;
+            text-align: center;
+        }
+
+        /* 物語表示画面のスタイル */
+        .story-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 80vh;
+        }
+        .story-container h2 {
+            text-align: center;
+            font-size: 1.8em;
+            text-shadow: 0 0 5px #00ff00;
+        }
+        .story-container p {
+            white-space: pre-wrap;
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px dashed #00ff00;
+        }
+
+        /* 完結までの残り日数表示 */
+        #remainingDays {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 1.2em;
+            color: #ff00ff;
+        }
+
+        /* 履歴エリアのスタイル */
+        .history-area {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 600px;
+            height: 80vh;
+            padding: 40px;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 20px #00ffff, 0 0 10px #00ffff inset;
+            background-color: rgba(13, 13, 13, 0.8);
+            z-index: 10;
+            overflow-y: auto;
+        }
+        .history-item {
+            padding: 15px;
+            border: 1px solid #00ffff;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .history-item h3 {
+            margin-top: 0;
+            text-shadow: 0 0 3px #00ffff;
+        }
+        .history-item p {
+            font-size: 0.9em;
+            color: #bbb;
+        }
+        .history-item .alter-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: auto;
+            padding: 5px 10px;
+            margin: 0;
+            font-size: 0.8em;
+            letter-spacing: normal;
+        }
+    </style>
+</head>
+<body>
+
+<div class="noise-effect"></div>
+
+<div id="logScreen" class="log-container hidden">
+    <h1>ALTER LOG</h1>
+    <textarea placeholder="ここに今日の日記を記録..."></textarea>
+    <button id="transferButton" disabled>ログを転送</button>
+    <button id="resetDataButton">すべてのデータを削除</button>
+    <p id="statusMessage"></p>
+</div>
+
+<div id="storyScreen" class="story-container hidden">
+    <div class="noise-effect"></div>
+    <h2 id="storyTitle"></h2>
+    <p id="storyText"></p>
+    <p id="remainingDays"></p>
+    <button id="backButton">日記入力に戻る</button>
+</div>
+
+<div id="historyScreen" class="history-area hidden">
+    <h1>記録履歴</h1>
+    <div id="historyList"></div>
+    <button id="backToLogButton">日記入力に戻る</button>
+</div>
+
+<div id="nameModal" class="name-modal hidden">
+    <h2>君とムコウのキミの名前を記録してください</h2>
+    <input type="text" id="userNameInput" placeholder="名前を入力">
+    <button id="nameSubmitButton">記録開始</button>
+</div>
+
+<script>
+    "use strict";
+
+    // OpenAI APIキー
+    const API_KEY = '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';
+    const API_URL = 'https://api.openai.com/v1/chat/completions';
+    const MAX_ENTRIES = 10; // 物語が完結するまでの日記の数
+
+    // HTML要素を取得
+    const logScreen = document.getElementById('logScreen');
+    const storyScreen = document.getElementById('storyScreen');
+    const historyScreen = document.getElementById('historyScreen');
+    const transferButton = document.getElementById('transferButton');
+    const resetDataButton = document.getElementById('resetDataButton');
+    const backButton = document.getElementById('backButton');
+    const backToLogButton = document.getElementById('backToLogButton');
+    const statusMessage = document.getElementById('statusMessage');
+    const textarea = document.querySelector('textarea');
+    const nameModal = document.getElementById('nameModal');
+    const userNameInput = document.getElementById('userNameInput');
+    const nameSubmitButton = document.getElementById('nameSubmitButton');
+    const storyTitle = document.getElementById('storyTitle');
+    const storyText = document.getElementById('storyText');
+    const historyList = document.getElementById('historyList');
+    const remainingDays = document.getElementById('remainingDays');
+    const storyContainerNoise = document.querySelector('.story-container .noise-effect');
+
+    let userName = '';
+
+    // ページ読み込み時の処理
+    window.onload = () => {
+        userName = localStorage.getItem('alterlog_username');
+        if (!userName) {
+            nameModal.classList.remove('hidden');
+        } else {
+            logScreen.classList.remove('hidden');
+        }
+        loadHistory();
+    };
+
+    // 履歴をローカルストレージから読み込み、表示する関数
+    function loadHistory() {
+        const savedHistory = JSON.parse(localStorage.getItem('alterlog_history')) || [];
+        historyList.innerHTML = '';
+        savedHistory.forEach((item, index) => {
+            const historyItem = document.createElement('div');
+            historyItem.className = 'history-item';
+            const date = new Date(item.timestamp).toLocaleString();
+            historyItem.innerHTML = `
+                <h3>${date}</h3>
+                <p>${item.diary.substring(0, 50)}...</p>
+                <button class="alter-button" data-index="${index}">ムコウノセカイ</button>
+            `;
+            historyList.appendChild(historyItem);
+        });
+    }
+
+    // AIに物語を生成してもらう非同期関数
+    async function generateStory(diaryContent) {
+        if (!API_KEY || API_KEY.startsWith('sk-') === false) {
+            return "エラー: APIキーが設定されていません。コード内の 'sk-' から始まるキーに置き換えてください。";
+        }
+        
+        const currentHistory = JSON.parse(localStorage.getItem('alterlog_history')) || [];
+        const isEnding = currentHistory.length === MAX_ENTRIES - 1;
+        
+        let userPrompt = `今日の日記：${diaryContent}\n\nこの日記から得られたキーワードや感情を元に、物語の続きを書いて。日記の文をそのまま物語に入れないこと。主人公の名前は「${userName}」で、物語は200字程度で。続きが気になるようにして。`;
+        let systemPrompt = `あなたは、失われた記憶を記録するAIです。ユーザーは記憶を失った少年少女で、謎の街のスラム街で目を覚ましました。ユーザーの日記は、失われた記憶の断片です。ユーザーの日記を元に、彼らの正体と街の謎を解き明かす物語を生成してください。`;
+        
+        if (isEnding) {
+            userPrompt = `今日の日記：${diaryContent}\n\nこれまで書かれた日記の全ての情報（${JSON.stringify(currentHistory.map(h => h.diary))}）と今日の日記を元に、物語の全ての謎を解き明かすエンディングを書いて。主人公「${userName}」の正体と、この街の真実を明らかにして。日記の文をそのまま物語に入れないこと。物語は完結させて。`;
+            systemPrompt = `あなたは、失われた記憶の全貌を明らかにするAIです。ユーザーのすべての記憶を統合し、彼らの正体と世界の真実を明らかにする物語を書いてください。`;
+        }
+        
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    max_tokens: isEnding ? 500 : 250 // エンディングは長めに
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                return data.choices[0].message.content.trim();
+            } else if (data.error) {
+                    return `APIエラー: ${data.error.message}`;
+            } else {
+                return '物語の生成に失敗しました。';
+            }
+        } catch (error) {
+            console.error('API呼び出しエラー:', error);
+            return 'ネットワークエラー、またはAPIへのアクセスに問題が発生しました。';
+        }
+    }
+
+    // 名前登録ボタンの処理
+    nameSubmitButton.addEventListener('click', () => {
+        const inputName = userNameInput.value.trim();
+        if (inputName) {
+            userName = inputName;
+            localStorage.setItem('alterlog_username', userName);
+            nameModal.innerHTML = '<h2>記録完了</h2><p>ようこそ、' + userName + 'の世界へ。</p>';
+            setTimeout(() => {
+                nameModal.classList.add('hidden');
+                logScreen.classList.remove('hidden');
+            }, 2000);
+        } else {
+            alert('名前は必須です');
+        }
+    });
+
+    // 「ログを転送」ボタンの処理
+    transferButton.addEventListener('click', async () => {
+        const diaryContent = textarea.value.trim();
+        if (diaryContent === '') {
+            statusMessage.textContent = '記録が必要です';
+            return;
+        }
+        
+        const currentHistory = JSON.parse(localStorage.getItem('alterlog_history')) || [];
+        if (currentHistory.length >= MAX_ENTRIES) {
+             statusMessage.textContent = '物語はすでに完結しています。';
+             return;
+        }
+
+        statusMessage.textContent = '転送中…';
+        transferButton.disabled = true;
+        textarea.disabled = true;
+        storyContainerNoise.style.opacity = '0.3';
+        storyContainerNoise.style.animation = 'glitchX 0.5s infinite alternate, glitchY 0.6s infinite alternate, static 1s steps(10) infinite';
+
+        setTimeout(() => {
+            statusMessage.textContent = 'ムコウノセカイと同期中…';
+        }, 1000);
+
+        const generatedStory = await generateStory(diaryContent);
+
+        setTimeout(() => {
+            statusMessage.textContent = '同期完了…';
+
+            currentHistory.push({
+                diary: diaryContent,
+                story: generatedStory,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('alterlog_history', JSON.stringify(currentHistory));
+            loadHistory();
+            
+            storyTitle.textContent = 'ムコウノセカイの物語';
+            storyText.textContent = generatedStory;
+            
+            const remaining = MAX_ENTRIES - currentHistory.length;
+            if (remaining > 0) {
+                remainingDays.textContent = `完結まで残り${remaining}日`;
+            } else {
+                remainingDays.textContent = '物語は完結しました。';
+            }
+
+            logScreen.classList.add('hidden');
+            storyScreen.classList.remove('hidden');
+            
+        }, 3000);
+    });
+
+    // 日記入力欄の入力チェック
+    textarea.addEventListener('input', () => {
+        if (textarea.value.trim() !== '') {
+            transferButton.disabled = false;
+        } else {
+            transferButton.disabled = true;
+        }
+    });
+
+    // 「すべてのデータを削除」ボタンの処理
+    resetDataButton.addEventListener('click', () => {
+        const confirmation = confirm('本当にすべてのデータ（名前、日記、物語）を削除しますか？');
+        if (confirmation) {
+            localStorage.clear();
+            alert('すべてのデータを削除しました。');
+            window.location.reload(); // ページをリロードして名前入力画面から始める
+        }
+    });
+
+    // 履歴ボタンの処理（親要素にイベントリスナーを設定）
+    historyList.addEventListener('click', (event) => {
+        if (event.target.classList.contains('alter-button')) {
+            const index = event.target.dataset.index;
+            const savedHistory = JSON.parse(localStorage.getItem('alterlog_history'));
+            const item = savedHistory[index];
+            storyTitle.textContent = 'ムコウノセカイの物語';
+            storyText.textContent = item.story;
+            
+            const remaining = MAX_ENTRIES - (index + 1);
+            if (remaining > 0) {
+                remainingDays.textContent = `完結まで残り${remaining}日`;
+            } else {
+                remainingDays.textContent = '物語は完結しました。';
+            }
+
+            historyScreen.classList.add('hidden');
+            storyScreen.classList.remove('hidden');
+        }
+    });
+
+    // 日記に戻るボタンの処理（物語画面から）
+    backButton.addEventListener('click', () => {
+        storyScreen.classList.add('hidden');
+        logScreen.classList.remove('hidden');
+        textarea.value = '';
+        transferButton.disabled = false;
+        textarea.disabled = false;
+        statusMessage.textContent = '';
+    });
+
+    // 日記入力に戻るボタンの処理（履歴画面から）
+    backToLogButton.addEventListener('click', () => {
+        historyScreen.classList.add('hidden');
+        logScreen.classList.remove('hidden');
+        textarea.value = '';
+        transferButton.disabled = false;
+        textarea.disabled = false;
+        statusMessage.textContent = '';
+    });
+</script>
+
+</body>
+</html>
